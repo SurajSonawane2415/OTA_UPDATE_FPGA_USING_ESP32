@@ -21,12 +21,15 @@ esp_err_t flash(const char *file_name)
         return err;
     }
 
-    char chunk[128];
-    while(fgets(chunk, sizeof(chunk), flash_file) != NULL) {
-         fputs(chunk, stdout);
+    char chunk;
+    //while(fgetc(chunk, sizeof(chunk), flash_file)) {
+    for(int i = 0; i<9588; i++) {
+        chunk = fgetc(flash_file);
+        fputc(chunk, stdout);
     }
 
      fclose(flash_file);
 
     return ESP_OK;
 }
+//spi write to eprom using esp32?
