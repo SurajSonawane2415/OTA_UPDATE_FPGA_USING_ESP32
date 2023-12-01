@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static const char *TAG = "stm_flash";
+static const char *TAG = "esp_flash";
 
 #define FILE_PATH_MAX 128
 #define BASE_PATH "/spiffs/"
