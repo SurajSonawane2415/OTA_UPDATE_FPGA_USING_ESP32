@@ -38,7 +38,7 @@ esp_err_t flash(const char *file_name)
     ota_begin();
     
     size_t read_bytes;
-    while ((read_bytes = fread(chunk, 1, sizeof(chunk), flash_file)) > 0)
+    while ((read_bytes = fread(chunk, 1, sizeof(chunk), flash_file)) > 0) // fread: to read binary files
     {
         ota_write(read_bytes);
     }
@@ -61,11 +61,11 @@ void get_ota_app_partition()
 
 void ota_begin()
 {   
-    ota_handle = 0; // Initialized with 0
+    ota_handle = 0; // Initialized with 0 
     esp_ota_begin(next_empty_ota_partition, OTA_SIZE_UNKNOWN, &ota_handle); // OTA start
     ESP_LOGI(TAG, "ESP OTA BEGIN SUCCESFULLY");
     /*If image size is not yet known, pass OTA_SIZE_UNKNOWN which will cause the entire partition to be erased.*/
-}
+} /*After ota begin allocates memory that remains in use until esp_ota_end() is called with the returned handle(ota_handle).*/
 
 void ota_write(size_t size)
 {
