@@ -91,33 +91,11 @@ esp_err_t flash(const char *file_name)
 
         ESP_LOGI(TAG, "Loading app...");
 
-        // Get the total size of the file
-        size_t total_file_size = get_file_size(flash_file);
-        size_t bytes_remaining = total_file_size;
-
-        while ((bytes_read = fread(buffer, 1, CHUNK_SIZE, flash_file)) > 0)
+        // Call flash_binary_from_file to flash the application binary
+        esp_err_t app_flash_result = flash_binary_from_file(file_path, bin.app.addr);
+        if (app_flash_result != ESP_OK)
         {
-            // Flash the chunk
-            esp_loader_error_t err = flash_binary(buffer, bytes_read, bin.app.addr);
-            if (err != ESP_LOADER_SUCCESS)
-            {
-                ESP_LOGE(TAG, "Error flashing binary file");
-                free(buffer);
-                fclose(flash_file);
-                return ESP_FAIL;
-            }
-            total_bytes_read += bytes_read;
-            bytes_remaining -= bytes_read;
-            ESP_LOGI(TAG, "Remaining bytes: %d", bytes_remaining);
-            if (bytes_remaining == 0) {
-                // If all bytes are read from the file, exit the loop
-                break;
-            }
-        }
-
-        if (ferror(flash_file))
-        {
-            ESP_LOGE(TAG, "Error reading file");
+            ESP_LOGE(TAG, "Failed to flash application binary");
             free(buffer);
             fclose(flash_file);
             return ESP_FAIL;
@@ -126,9 +104,14 @@ esp_err_t flash(const char *file_name)
         free(buffer);
         fclose(flash_file);
 
-        ESP_LOGI(TAG, "File read and flashed successfully, total bytes read: %d", total_bytes_read);
+        ESP_LOGI(TAG, "File read and flashed successfully");
         ESP_LOGI(TAG, "Done!");
+        return ESP_OK;
     }
 
-    return ESP_OK;
+    // Clean up in case of failure
+    free(buffer);
+    fclose(flash_file);
+
+    return ESP_FAIL;
 }
