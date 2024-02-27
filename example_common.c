@@ -30,7 +30,8 @@
 // For esp32s3 and later chips
 #define BOOTLOADER_ADDRESS_V1       0x0
 #define PARTITION_ADDRESS           0x8000
-#define APPLICATION_ADDRESS         0x10000
+#define APPLICATION_ADDRESS         0x10000 /* by changing this flashed binary file to different partitions
+                                                for factory app = 0x10000, ota0 = 0x110000, ota1 = 0x210000 */
 #define CHUNK_SIZE 1024
 
 extern const uint8_t  ESP32_bootloader_bin[];
@@ -334,6 +335,79 @@ esp_loader_error_t flash_binary(const uint8_t *bin, size_t size, size_t address)
 
     return ESP_LOADER_SUCCESS;
 }
+
+esp_loader_error_t flash_binary_from_file(const char *file_path, size_t address)
+{
+    esp_loader_error_t err = ESP_LOADER_SUCCESS; // Initialize err here
+    
+    static uint8_t payload[CHUNK_SIZE]; // Use CHUNK_SIZE instead of fixed 1024
+    
+    FILE *binary_file = fopen(file_path, "rb");
+    if (binary_file == NULL) {
+        printf("Failed to open binary file: %s\n", file_path);
+        return err; // Return uninitialized err here
+    }
+
+    printf("Flash address: 0x%zx\n", address);
+    printf("Erasing flash (this may take a while)...\n");
+    
+    fseek(binary_file, 0, SEEK_END);
+    size_t binary_size = ftell(binary_file);
+    rewind(binary_file);
+
+    err = esp_loader_flash_start(address, binary_size, CHUNK_SIZE); // Use CHUNK_SIZE for payload size
+    if (err != ESP_LOADER_SUCCESS) {
+        printf("Erasing flash failed with error %d.\n", err);
+        fclose(binary_file);
+        return err;
+    }
+    printf("Start programming\n");
+
+    size_t written = 0;
+
+    while (!feof(binary_file)) {
+        size_t to_read = fread(payload, 1, CHUNK_SIZE, binary_file);
+        if (to_read == 0 && !feof(binary_file)) {
+            printf("\nError reading from file.\n");
+            fclose(binary_file);
+            return err;
+        }
+
+        err = esp_loader_flash_write(payload, to_read);
+        if (err != ESP_LOADER_SUCCESS) {
+            printf("\nPacket could not be written! Error %d.\n", err);
+            fclose(binary_file);
+            return err;
+        }
+
+        written += to_read;
+
+        int progress = (int)(((float)written / binary_size) * 100);
+        printf("\rProgress: %d %%", progress);
+        fflush(stdout);
+    };
+
+    printf("\nFinished programming\n");
+
+#if MD5_ENABLED
+    err = esp_loader_flash_verify();
+    if (err == ESP_LOADER_ERROR_UNSUPPORTED_FUNC) {
+        printf("ESP8266 does not support flash verify command.");
+        fclose(binary_file);
+        return err;
+    } else if (err != ESP_LOADER_SUCCESS) {
+        printf("MD5 does not match. err: %d\n", err);
+        fclose(binary_file);
+        return err;
+    }
+    printf("Flash verified\n");
+#endif
+
+    fclose(binary_file);
+    return ESP_LOADER_SUCCESS;
+}
+
+
 #endif /* SERIAL_FLASHER_INTERFACE_UART*/
 
 esp_loader_error_t load_ram_binary(const uint8_t *bin)
@@ -388,3 +462,4 @@ esp_loader_error_t load_ram_binary(const uint8_t *bin)
 
     return ESP_LOADER_SUCCESS;
 }
+
