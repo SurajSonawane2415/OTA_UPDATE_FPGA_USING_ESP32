@@ -434,18 +434,46 @@ static esp_err_t flash_post_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
-    filename++;
-    if (flash(filename) != ESP_OK)
+    filename++; // Skip the leading '/'
+    int partition_address;
+
+    // Determine the partition address based on the URI
+    if (strncmp(req->uri, "/flash/factory/", strlen("/flash/factory/")) == 0)
     {
-        ESP_LOGE(TAG, "%s", "Target flashing failed");
+        partition_address = 0x10000; // Address for factory partition
+    }
+    else if (strncmp(req->uri, "/flash/ota0/", strlen("/flash/ota0/")) == 0)
+    {
+        partition_address = 0x110000; // Address for ota0 partition
+    }
+    else if (strncmp(req->uri, "/flash/ota1/", strlen("/flash/ota1/")) == 0)
+    {
+        partition_address = 0x210000; // Address for ota1 partition
+    }
+    else
+    {
+        // Invalid URI
+        ESP_LOGE(TAG, "Invalid URI : %s", req->uri);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid URI");
+        return ESP_FAIL;
     }
 
+    if (flash(filename, partition_address) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "%s", "Target flashing failed");
+        // Respond with error status
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Flashing failed");
+        return ESP_FAIL;
+    }
+
+    // Flashing successful, send success response
     httpd_resp_set_status(req, "303 See Other");
     httpd_resp_set_hdr(req, "Location", "/");
-    httpd_resp_sendstr(req, "File flashed");
+    httpd_resp_sendstr(req, "File flashed successfully");
 
     return ESP_OK;
 }
+
 
 /* Handler to delete a file from the server */
 static esp_err_t delete_post_handler(httpd_req_t *req)
